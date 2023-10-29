@@ -18,10 +18,10 @@ from utils import (
     get_evaluation_bboxes,
     check_class_accuracy,
     get_loaders,
+    save_checkpoint,
+    load_checkpoint,
     plot_couple_examples
 )
-#    save_checkpoint,
-#    load_checkpoint,
 
 from loss import YoloLoss
 import warnings
@@ -73,10 +73,10 @@ def main():
         train_csv_path=config.DATASET + "/train.csv", test_csv_path=config.DATASET + "/test.csv"
     )
 
-#    if config.LOAD_MODEL:
-#        load_checkpoint(
-#            config.CHECKPOINT_FILE, model, optimizer, config.LEARNING_RATE
-#        )
+    if config.LOAD_MODEL:
+        load_checkpoint(
+            config.CHECKPOINT_FILE, model, optimizer, config.LEARNING_RATE
+        )
 
     scaled_anchors = (
         torch.tensor(config.ANCHORS)
@@ -87,8 +87,8 @@ def main():
         #plot_couple_examples(model, test_loader, 0.6, 0.5, scaled_anchors)
         train_fn(train_loader, model, optimizer, loss_fn, scaler, scaled_anchors)
 
-        #if config.SAVE_MODEL:
-        #    save_checkpoint(model, optimizer, filename=f"checkpoint.pth.tar")
+        if config.SAVE_MODEL:
+            save_checkpoint(model, optimizer, filename=f"checkpoint.pth.tar")
 
         #print(f"Currently epoch {epoch}")
         #print("On Train Eval loader:")
