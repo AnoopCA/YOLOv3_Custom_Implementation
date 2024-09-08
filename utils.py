@@ -33,9 +33,6 @@ def iou_width_height(boxes1, boxes2):
 
 def intersection_over_union(boxes_preds, boxes_labels, box_format="midpoint"):
     """
-    Video explanation of this function:
-    https://youtu.be/XXYG5ZWtjj0
-
     This function calculates intersection over union (iou) given pred boxes
     and target boxes.
 
@@ -82,9 +79,6 @@ def intersection_over_union(boxes_preds, boxes_labels, box_format="midpoint"):
 
 def non_max_suppression(bboxes, iou_threshold, threshold, box_format="corners"):
     """
-    Video explanation of this function:
-    https://youtu.be/YDkjWEN8jNA
-
     Does Non Max Suppression given bboxes
 
     Parameters:
@@ -128,9 +122,6 @@ def mean_average_precision(
     pred_boxes, true_boxes, iou_threshold=0.5, box_format="midpoint", num_classes=20
 ):
     """
-    Video explanation of this function:
-    https://youtu.be/FppOzcDvaDI
-
     This function calculates mean average precision (mAP)
 
     Parameters:
@@ -155,9 +146,7 @@ def mean_average_precision(
         detections = []
         ground_truths = []
 
-        # Go through all predictions and targets,
-        # and only add the ones that belong to the
-        # current class c
+        # Go through all predictions and targets, and only add the ones that belong to the current class c
         for detection in pred_boxes:
             if detection[1] == c:
                 detections.append(detection)
@@ -166,15 +155,11 @@ def mean_average_precision(
             if true_box[1] == c:
                 ground_truths.append(true_box)
 
-        # find the amount of bboxes for each training example
-        # Counter here finds how many ground truth bboxes we get
-        # for each training example, so let's say img 0 has 3,
-        # img 1 has 5 then we will obtain a dictionary with:
-        # amount_bboxes = {0:3, 1:5}
+        # find the amount of bboxes for each training example Counter here finds how many ground truth bboxes we get for each
+        # training example, so let's say img 0 has 3, img 1 has 5 then we will obtain a dictionary with: amount_bboxes = {0:3, 1:5}
         amount_bboxes = Counter([gt[0] for gt in ground_truths])
 
-        # We then go through each key, val in this dictionary
-        # and convert to the following (w.r.t same example):
+        # We then go through each key, val in this dictionary and convert to the following (w.r.t same example):
         # ammount_bboxes = {0:torch.tensor[0,0,0], 1:torch.tensor[0,0,0,0,0]}
         for key, val in amount_bboxes.items():
             amount_bboxes[key] = torch.zeros(val)
@@ -190,8 +175,7 @@ def mean_average_precision(
             continue
 
         for detection_idx, detection in enumerate(detections):
-            # Only take out the ground_truths that have the same
-            # training idx as detection
+            # Only take out the ground_truths that have the same training idx as detection
             ground_truth_img = [
                 bbox for bbox in ground_truths if bbox[0] == detection[0]
             ]
@@ -439,8 +423,7 @@ def load_checkpoint(checkpoint_file, model, optimizer, lr):
     model.load_state_dict(checkpoint["state_dict"])
     optimizer.load_state_dict(checkpoint["optimizer"])
 
-    # If we don't do this then it will just have learning rate of old checkpoint
-    # and it will lead to many hours of debugging \:
+    # If we don't do this then it will just have learning rate of old checkpoint and it will lead to many hours of debugging \:
 #    for param_group in optimizer.param_groups:
 #        param_group["lr"] = lr
 
@@ -524,15 +507,3 @@ def plot_couple_examples(model, loader, thresh, iou_thresh, anchors):
             bboxes[i], iou_threshold=iou_thresh, threshold=thresh, box_format="midpoint",
         )
         plot_image(x[i].permute(1,2,0).detach().cpu(), nms_boxes)
-
-
-
-def seed_everything(seed=42):
-    os.environ['PYTHONHASHSEED'] = str(seed)
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False

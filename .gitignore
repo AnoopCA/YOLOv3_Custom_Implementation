@@ -1,4 +1,5 @@
-PASCAL_VOC/
-p3.9_yolov3/
-.vscode/
 __pycache__/
+.vscode/
+Archives/
+p3.9_yolov3/
+PASCAL_VOC/
