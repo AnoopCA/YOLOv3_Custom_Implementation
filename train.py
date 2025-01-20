@@ -12,26 +12,24 @@ from tqdm import tqdm
 import warnings
 warnings.filterwarnings('ignore')
 
+import datetime
+start_time = datetime.datetime.now()
+
 from utils import (
     mean_average_precision,
-    cells_to_bboxes,
     get_evaluation_bboxes,
     check_class_accuracy,
     get_loaders,
     save_checkpoint,
-    load_checkpoint,
-    plot_couple_examples
+    load_checkpoint
 )
 
 from loss import YoloLoss
-import warnings
-warnings.filterwarnings("ignore")
 
 torch.backends.cudnn.benchmark = True
 
-
-def train_fn(train_loader, model, optimizer, loss_fn, scaler, scaled_anchors):
-    loop = tqdm(train_loader, leave=True)
+def train_fn(train_loader, model, optimizer, loss_fn, scaler, scaled_anchors, epoch):
+    loop = tqdm(train_loader, leave=True, desc=f"Training batches in the epoch {epoch+1}/{config.NUM_EPOCHS}")
     losses = []
     for batch_idx, (x, y) in enumerate(loop):
         x = x.to(config.DEVICE)
@@ -40,7 +38,6 @@ def train_fn(train_loader, model, optimizer, loss_fn, scaler, scaled_anchors):
             y[1].to(config.DEVICE),
             y[2].to(config.DEVICE),
         )
-
         with torch.cuda.amp.autocast():
             out = model(x)
             loss = (
@@ -60,7 +57,6 @@ def train_fn(train_loader, model, optimizer, loss_fn, scaler, scaled_anchors):
         loop.set_postfix(loss=mean_loss)
 
 
-
 def main():
     model = YOLOv3(num_classes=config.NUM_CLASSES).to(config.DEVICE)
     optimizer = optim.Adam(
@@ -70,12 +66,13 @@ def main():
     scaler = torch.cuda.amp.GradScaler()
 
     train_loader, test_loader, train_eval_loader = get_loaders(
-        train_csv_path=config.DATASET + "/train.csv", test_csv_path=config.DATASET + "/test.csv"
+        #train_csv_path=config.DATASET + config.TRAIN_FILE, test_csv_path=config.DATASET + config.TEST_FILE
+        train_csv_path=config.TRAIN_IMG_NAMES, test_csv_path=config.TEST_IMG_NAMES
     )
 
     if config.LOAD_MODEL:
         load_checkpoint(
-            config.CHECKPOINT_FILE, model, optimizer, config.LEARNING_RATE
+            config.LOAD_MODEL_NAME, model, optimizer, config.LEARNING_RATE
         )
 
     scaled_anchors = (
@@ -84,13 +81,13 @@ def main():
     ).to(config.DEVICE)
 
     for epoch in range(config.NUM_EPOCHS):
-        #plot_couple_examples(model, test_loader, 0.6, 0.5, scaled_anchors)
-        train_fn(train_loader, model, optimizer, loss_fn, scaler, scaled_anchors)
+        train_fn(train_loader, model, optimizer, loss_fn, scaler, scaled_anchors, epoch)
 
-        if config.SAVE_MODEL:
-            save_checkpoint(model, optimizer, filename=f"checkpoint.pth.tar")
+        if (epoch+1) % config.SAVE_CHECKPOINT_FREQ == 0:
+            if config.SAVE_MODEL:
+                save_checkpoint(model, optimizer, filename=config.SAVE_MODEL_NAME)
 
-        if epoch > 0 and epoch % 3 == 0:
+        if (epoch+1) % config.PRINT_METRIC == 0:
             check_class_accuracy(model, test_loader, threshold=config.CONF_THRESHOLD)
             pred_boxes, true_boxes = get_evaluation_bboxes(
                 test_loader,
@@ -109,6 +106,7 @@ def main():
             print(f"MAP: {mapval.item()}")
             model.train()
 
-
 if __name__ == "__main__":
     main()
+    print(f"Processing time: {datetime.datetime.now()-start_time}")
+

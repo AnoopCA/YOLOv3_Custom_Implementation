@@ -1,51 +1,23 @@
-import config
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
 import numpy as np
 import os
-import random
+import config
 import torch
-
 from collections import Counter
 from torch.utils.data import DataLoader
-from tqdm import tqdm
 
 import warnings
 warnings.filterwarnings('ignore')
 
-
+# This function accepts width and height of the 2 bounding boxes and returns Intersection over union of the corresponding boxes
 def iou_width_height(boxes1, boxes2):
-    """
-    Parameters:
-        boxes1 (tensor): width and height of the first bounding boxes
-        boxes2 (tensor): width and height of the second bounding boxes
-    Returns:
-        tensor: Intersection over union of the corresponding boxes
-    """
-    intersection = torch.min(boxes1[..., 0], boxes2[..., 0]) * torch.min(
-        boxes1[..., 1], boxes2[..., 1]
-    )
-    union = (
-        boxes1[..., 0] * boxes1[..., 1] + boxes2[..., 0] * boxes2[..., 1] - intersection
-    )
+    intersection = torch.min(boxes1[..., 0], boxes2[..., 0]) * torch.min(boxes1[..., 1], boxes2[..., 1])
+    union = (boxes1[..., 0] * boxes1[..., 1] + boxes2[..., 0] * boxes2[..., 1] - intersection)
     return intersection / union
 
-
+# This function calculates intersection over union (iou) given pred boxes and target boxes.
 def intersection_over_union(boxes_preds, boxes_labels, box_format="midpoint"):
-    """
-    This function calculates intersection over union (iou) given pred boxes
-    and target boxes.
-
-    Parameters:
-        boxes_preds (tensor): Predictions of Bounding Boxes (BATCH_SIZE, 4)
-        boxes_labels (tensor): Correct labels of Bounding Boxes (BATCH_SIZE, 4)
-        box_format (str): midpoint/corners, if boxes (x,y,w,h) or (x1,y1,x2,y2)
-
-    Returns:
-        tensor: Intersection over union for all examples
-    """
-
     if box_format == "midpoint":
+        # x1=x−w/2, y1=y−h/2
         box1_x1 = boxes_preds[..., 0:1] - boxes_preds[..., 2:3] / 2
         box1_y1 = boxes_preds[..., 1:2] - boxes_preds[..., 3:4] / 2
         box1_x2 = boxes_preds[..., 0:1] + boxes_preds[..., 2:3] / 2
@@ -76,69 +48,37 @@ def intersection_over_union(boxes_preds, boxes_labels, box_format="midpoint"):
 
     return intersection / (box1_area + box2_area - intersection + 1e-6)
 
-
+# Does Non Max Suppression given bboxes
 def non_max_suppression(bboxes, iou_threshold, threshold, box_format="corners"):
-    """
-    Does Non Max Suppression given bboxes
-
-    Parameters:
-        bboxes (list): list of lists containing all bboxes with each bboxes
-        specified as [class_pred, prob_score, x1, y1, x2, y2]
-        iou_threshold (float): threshold where predicted bboxes is correct
-        threshold (float): threshold to remove predicted bboxes (independent of IoU)
-        box_format (str): "midpoint" or "corners" used to specify bboxes
-
-    Returns:
-        list: bboxes after performing NMS given a specific IoU threshold
-    """
-
     assert type(bboxes) == list
-
     bboxes = [box for box in bboxes if box[1] > threshold]
     bboxes = sorted(bboxes, key=lambda x: x[1], reverse=True)
     bboxes_after_nms = []
 
     while bboxes:
         chosen_box = bboxes.pop(0)
-
+        # Consider the bounding boxes that belong to different classes or do not correspond to the same object.
+        # (Less than iou_threshold means, exclude bounding boxes that has higher overlapp.)
         bboxes = [
             box
             for box in bboxes
             if box[0] != chosen_box[0]
-            or intersection_over_union(
-                torch.tensor(chosen_box[2:]),
-                torch.tensor(box[2:]),
-                box_format=box_format,
-            )
-            < iou_threshold
+                or intersection_over_union(
+                    torch.tensor(chosen_box[2:]),
+                    torch.tensor(box[2:]),
+                    box_format=box_format,
+                                          ) < iou_threshold
         ]
 
         bboxes_after_nms.append(chosen_box)
-
+       
     return bboxes_after_nms
 
-
+# This function calculates mean average precision (mAP) across all classes given a specific IoU threshold
 def mean_average_precision(
-    pred_boxes, true_boxes, iou_threshold=0.5, box_format="midpoint", num_classes=20
-):
-    """
-    This function calculates mean average precision (mAP)
-
-    Parameters:
-        pred_boxes (list): list of lists containing all bboxes with each bboxes
-        specified as [train_idx, class_prediction, prob_score, x1, y1, x2, y2]
-        true_boxes (list): Similar as pred_boxes except all the correct ones
-        iou_threshold (float): threshold where predicted bboxes is correct
-        box_format (str): "midpoint" or "corners" used to specify bboxes
-        num_classes (int): number of classes
-
-    Returns:
-        float: mAP value across all classes given a specific IoU threshold
-    """
-
+    pred_boxes, true_boxes, iou_threshold=0.5, box_format="midpoint", num_classes=config.NUM_CLASSES):
     # list storing all AP for respective classes
     average_precisions = []
-
     # used for numerical stability later on
     epsilon = 1e-6
 
@@ -160,7 +100,7 @@ def mean_average_precision(
         amount_bboxes = Counter([gt[0] for gt in ground_truths])
 
         # We then go through each key, val in this dictionary and convert to the following (w.r.t same example):
-        # ammount_bboxes = {0:torch.tensor[0,0,0], 1:torch.tensor[0,0,0,0,0]}
+        # amount_bboxes = {0:torch.tensor[0,0,0], 1:torch.tensor[0,0,0,0,0]}
         for key, val in amount_bboxes.items():
             amount_bboxes[key] = torch.zeros(val)
 
@@ -203,7 +143,7 @@ def mean_average_precision(
                 else:
                     FP[detection_idx] = 1
 
-            # if IOU is lower then the detection is a false positive
+            # if IOU is lower than the detection is a false positive
             else:
                 FP[detection_idx] = 1
 
@@ -217,51 +157,6 @@ def mean_average_precision(
         average_precisions.append(torch.trapz(precisions, recalls))
 
     return sum(average_precisions) / len(average_precisions)
-
-
-def plot_image(image, boxes):
-    """Plots predicted bounding boxes on the image"""
-    cmap = plt.get_cmap("tab20b")
-    class_labels = config.COCO_LABELS if config.DATASET=='COCO' else config.PASCAL_CLASSES
-    colors = [cmap(i) for i in np.linspace(0, 1, len(class_labels))]
-    im = np.array(image)
-    height, width, _ = im.shape
-
-    # Create figure and axes
-    fig, ax = plt.subplots(1)
-    # Display the image
-    ax.imshow(im)
-
-    # box[0] is x midpoint, box[2] is width
-    # box[1] is y midpoint, box[3] is height
-
-    # Create a Rectangle patch
-    for box in boxes:
-        assert len(box) == 6, "box should contain class pred, confidence, x, y, width, height"
-        class_pred = box[0]
-        box = box[2:]
-        upper_left_x = box[0] - box[2] / 2
-        upper_left_y = box[1] - box[3] / 2
-        rect = patches.Rectangle(
-            (upper_left_x * width, upper_left_y * height),
-            box[2] * width,
-            box[3] * height,
-            linewidth=2,
-            edgecolor=colors[int(class_pred)],
-            facecolor="none",
-        )
-        # Add the patch to the Axes
-        ax.add_patch(rect)
-        plt.text(
-            upper_left_x * width,
-            upper_left_y * height,
-            s=class_labels[int(class_pred)],
-            color="white",
-            verticalalignment="top",
-            bbox={"color": colors[int(class_pred)], "pad": 0},
-        )
-
-    plt.show()
 
 
 def get_evaluation_bboxes(
@@ -278,7 +173,7 @@ def get_evaluation_bboxes(
     train_idx = 0
     all_pred_boxes = []
     all_true_boxes = []
-    for batch_idx, (x, labels) in enumerate(tqdm(loader)):
+    for batch_idx, (x, labels) in enumerate(loader):
         x = x.to(device)
 
         with torch.no_grad():
@@ -320,21 +215,9 @@ def get_evaluation_bboxes(
     model.train()
     return all_pred_boxes, all_true_boxes
 
-
+# Scales the predictions coming from the model to be relative to the entire image and return the converted 
+# boxes of sizes (N, num_anchors, S, S, 1+5) with class index, object score, bounding box coordinates
 def cells_to_bboxes(predictions, anchors, S, is_preds=True):
-    """
-    Scales the predictions coming from the model to
-    be relative to the entire image such that they for example later
-    can be plotted or.
-    INPUT:
-    predictions: tensor of size (N, 3, S, S, num_classes+5)
-    anchors: the anchors used for the predictions
-    S: the number of cells the image is divided in on the width (and height)
-    is_preds: whether the input is predictions or the true bounding boxes
-    OUTPUT:
-    converted_bboxes: the converted boxes of sizes (N, num_anchors, S, S, 1+5) with class index,
-                      object score, bounding box coordinates
-    """
     BATCH_SIZE = predictions.shape[0]
     num_anchors = len(anchors)
     box_predictions = predictions[..., 1:5]
@@ -366,15 +249,15 @@ def check_class_accuracy(model, loader, threshold):
     tot_noobj, correct_noobj = 0, 0
     tot_obj, correct_obj = 0, 0
 
-    for idx, (x, y) in enumerate(tqdm(loader)):
+    for idx, (x, y) in enumerate(loader):
         x = x.to(config.DEVICE)
         with torch.no_grad():
             out = model(x)
 
         for i in range(3):
             y[i] = y[i].to(config.DEVICE)
-            obj = y[i][..., 0] == 1 # in paper this is Iobj_i
-            noobj = y[i][..., 0] == 0  # in paper this is Iobj_i
+            obj = y[i][..., 0] == 1
+            noobj = y[i][..., 0] == 0
 
             correct_class += torch.sum(
                 torch.argmax(out[i][..., 5:][obj], dim=-1) == y[i][..., 5][obj]
@@ -393,21 +276,6 @@ def check_class_accuracy(model, loader, threshold):
     model.train()
 
 
-def get_mean_std(loader):
-    # var[X] = E[X**2] - E[X]**2
-    channels_sum, channels_sqrd_sum, num_batches = 0, 0, 0
-
-    for data, _ in tqdm(loader):
-        channels_sum += torch.mean(data, dim=[0, 2, 3])
-        channels_sqrd_sum += torch.mean(data ** 2, dim=[0, 2, 3])
-        num_batches += 1
-
-    mean = channels_sum / num_batches
-    std = (channels_sqrd_sum / num_batches - mean ** 2) ** 0.5
-
-    return mean, std
-
-
 def save_checkpoint(model, optimizer, filename="my_checkpoint.pth.tar"):
     print("=> Saving checkpoint")
     checkpoint = {
@@ -423,29 +291,26 @@ def load_checkpoint(checkpoint_file, model, optimizer, lr):
     model.load_state_dict(checkpoint["state_dict"])
     optimizer.load_state_dict(checkpoint["optimizer"])
 
-    # If we don't do this then it will just have learning rate of old checkpoint and it will lead to many hours of debugging \:
-#    for param_group in optimizer.param_groups:
-#        param_group["lr"] = lr
-
-
 def get_loaders(train_csv_path, test_csv_path):
     from dataset import YOLODataset
 
     IMAGE_SIZE = config.IMAGE_SIZE
     train_dataset = YOLODataset(
         train_csv_path,
-        transform=config.train_transforms,
+#        csv_file_img = config.TRAIN_IMG_NAMES,
+        transform=config.test_transforms, #config.train_transforms,
         S=[IMAGE_SIZE // 32, IMAGE_SIZE // 16, IMAGE_SIZE // 8],
         img_dir=config.IMG_DIR,
-        label_dir=config.LABEL_DIR,
+#        label_dir=config.LABEL_DIR,
         anchors=config.ANCHORS,
     )
     test_dataset = YOLODataset(
         test_csv_path,
+#        csv_file_img = config.TEST_IMG_NAMES,
         transform=config.test_transforms,
         S=[IMAGE_SIZE // 32, IMAGE_SIZE // 16, IMAGE_SIZE // 8],
         img_dir=config.IMG_DIR,
-        label_dir=config.LABEL_DIR,
+#        label_dir=config.LABEL_DIR,
         anchors=config.ANCHORS,
     )
     train_loader = DataLoader(
@@ -467,10 +332,11 @@ def get_loaders(train_csv_path, test_csv_path):
 
     train_eval_dataset = YOLODataset(
         train_csv_path,
+#        csv_file_img = config.EVAL_IMG_NAMES,
         transform=config.test_transforms,
         S=[IMAGE_SIZE // 32, IMAGE_SIZE // 16, IMAGE_SIZE // 8],
         img_dir=config.IMG_DIR,
-        label_dir=config.LABEL_DIR,
+#        label_dir=config.LABEL_DIR,
         anchors=config.ANCHORS,
     )
     train_eval_loader = DataLoader(
@@ -483,27 +349,3 @@ def get_loaders(train_csv_path, test_csv_path):
     )
 
     return train_loader, test_loader, train_eval_loader
-
-def plot_couple_examples(model, loader, thresh, iou_thresh, anchors):
-    model.eval()
-    x, y = next(iter(loader))
-    x = x.to("cuda")
-    with torch.no_grad():
-        out = model(x)
-        bboxes = [[] for _ in range(x.shape[0])]
-        for i in range(3):
-            batch_size, A, S, _, _ = out[i].shape
-            anchor = anchors[i]
-            boxes_scale_i = cells_to_bboxes(
-                out[i], anchor, S=S, is_preds=True
-            )
-            for idx, (box) in enumerate(boxes_scale_i):
-                bboxes[idx] += box
-
-        model.train()
-
-    for i in range(batch_size):
-        nms_boxes = non_max_suppression(
-            bboxes[i], iou_threshold=iou_thresh, threshold=thresh, box_format="midpoint",
-        )
-        plot_image(x[i].permute(1,2,0).detach().cpu(), nms_boxes)

@@ -3,3 +3,5 @@ __pycache__/
 Archives/
 p3.9_yolov3/
 PASCAL_VOC/
+Data/
+Models/
