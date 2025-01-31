@@ -1,3 +1,4 @@
+# Import necessary libraries
 import numpy as np
 import pandas as pd
 import os
@@ -15,6 +16,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 img_dir = r'D:\ML_Projects\YOLOv3_Custom_Implementation\Data\test_images'
 model_path = r'D:\ML_Projects\YOLOv3_Custom_Implementation\Models\fmd_yolov3_12.pth.tar'
 
+# Function to get bounding boxes using functions "cells_to_bboxes" and "non_max_suppression"
 def get_bboxes(x, model, iou_threshold, anchors, threshold):
     model.eval()
     with torch.no_grad():
