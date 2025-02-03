@@ -42,6 +42,7 @@ model.eval()
 plt.ion()  # Turn on interactive mode
 fig, ax = plt.subplots(figsize=(8, 6))
 
+# Iterating Through Each Image for Object Detection Using YOLOv3 and Drawing Bounding Boxes  
 for img_name in os.listdir(img_dir):
     img_path = os.path.join(img_dir, img_name)
     img = Image.open(img_path).convert("RGB")
