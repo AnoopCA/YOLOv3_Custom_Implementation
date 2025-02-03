@@ -32,6 +32,7 @@ def get_bboxes(x, model, iou_threshold, anchors, threshold):
     model.train()
     return nms_boxes
 
+# Load the pre-trained YOLOv3 model and set it to evaluation mode
 model = YOLOv3(num_classes=config.NUM_CLASSES)
 checkpoint = torch.load(model_path, map_location=device)
 model.load_state_dict(checkpoint['state_dict'])
