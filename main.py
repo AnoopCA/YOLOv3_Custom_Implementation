@@ -1,3 +1,4 @@
+# Import necessary libraries
 import numpy as np
 import os
 import sys
@@ -15,6 +16,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 sys.path.append(os.path.abspath(r"D:\ML_Projects\YOLOv3_Custom_Implementation"))
 model_path = r'D:\ML_Projects\YOLOv3_Custom_Implementation\Models\fmd_yolov3_12.pth.tar'
 
+# Function to get bounding boxes using functions "cells_to_bboxes" and "non_max_suppression"
 def get_bboxes(x, model, iou_threshold, anchors, threshold):
     model.eval()
     with torch.no_grad():
@@ -30,12 +32,14 @@ def get_bboxes(x, model, iou_threshold, anchors, threshold):
     model.train()
     return nms_boxes
 
+# Load the pre-trained YOLOv3 model and set it to evaluation mode
 model = YOLOv3(num_classes=config.NUM_CLASSES)
 checkpoint = torch.load(model_path, map_location=device)
 model.load_state_dict(checkpoint['state_dict'])
 model.to(device)
 model.eval()
 
+# This function processes an input image, applies a trained model to detect objects, and draws bounding boxes around detected objects
 def get_pred(raw_img, bb_ln_width):
     img_rgb = cv2.cvtColor(raw_img, cv2.COLOR_BGR2RGB)
     img = Image.fromarray(img_rgb)
