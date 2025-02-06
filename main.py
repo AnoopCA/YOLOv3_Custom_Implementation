@@ -65,13 +65,15 @@ def get_pred(raw_img, bb_ln_width):
                 cv2.rectangle(original_img_np, (x1, y1), (x2, y2), (255, 0, 0), bb_ln_width)
     return(original_img_np)
 
-
+# Set title of the web page
 st.title("Face Mask Detection System")
 choice = st.sidebar.selectbox("MENU", ("HOME", "IMAGE", "VIDEO", "CAMERA"))
 
+# Setup home page
 if choice == "HOME":
     st.header("Welcome!")
 
+# Setup the options for the choice IMAGE
 elif choice == "IMAGE":
     file = st.file_uploader("Upload Image")
     if file:
@@ -81,6 +83,7 @@ elif choice == "IMAGE":
         img = get_pred(img, 1)
         st.image(img, channels='RGB', width=400)
 
+# Setup the options for the choice VIDEO
 elif choice == "VIDEO":
     file = st.file_uploader("Upload Video")
     windows = st.empty()
@@ -96,6 +99,7 @@ elif choice == "VIDEO":
             windows.image(img, channels="RGB")
         vid.release()
 
+# Setup the options for the choice CAMERA
 elif choice == "CAMERA":
     st.session_state["CAMERA"] = True
     k = st.text_input("Enter 0 to open webcam or write URL for opening IP camera")
