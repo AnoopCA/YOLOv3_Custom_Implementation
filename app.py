@@ -13,6 +13,7 @@ from utils import cells_to_bboxes, non_max_suppression
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+# Setup paths to the test images and the model
 img_dir = r'D:\ML_Projects\YOLOv3_Custom_Implementation\Data\test_images'
 model_path = r'D:\ML_Projects\YOLOv3_Custom_Implementation\Models\fmd_yolov3_12.pth.tar'
 
