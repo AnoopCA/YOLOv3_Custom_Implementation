@@ -53,6 +53,7 @@ for img_name in os.listdir(img_dir):
     img = img.unsqueeze(0)
     img = img.to(device)
     results = get_bboxes(img, model, iou_threshold=config.NMS_IOU_THRESH, anchors=config.ANCHORS, threshold=config.CONF_THRESHOLD)
+    # Draw bounding boxes for each of the objects in the image
     for r in results:
         class_pred, prob_score, center_x, center_y, width, height = r
         if prob_score > 0.95:
